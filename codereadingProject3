@@ -1,0 +1,29 @@
+Stephen's Answers:
+1. When a thread exits, priority level for that thread is set to high. Thread vmspace is set to NULL, along with the thread virtual file pointer t_cwd. Thread number is decreased, and then the thread is switched using mi_switch().
+When a thread sleeps, the cpu is yielded to another process. The thread can be woken back up by using thread_wakeup(). 
+
+2. mi_switch(), mips_switch in switch.S? <- check me on this
+
+3. 4, Run, ready, sleep, and zombie.
+
+4. Turning interrupts off means the currently running process cannot be interrupted from whatever it is doing.
+This is accomplished using splhigh() in MIPS. If you do not turn off interrupts in the thread subsystem code, the system can
+end up sleeping forever.
+
+5. The thread is removed from the list of sleeping threads, and set to a runnable state. There is not a gaurantee that 
+the thread will execute, but it is put into the pool of threads requesting CPU time. thread_wakeup() must be called on a sleeping thread for it to be available to run again.
+
+6. scheduler() is responsible for choosing the next thread to run.
+
+7. It picks the next thread from a round-robin style queue.
+
+8. It provides a hardclock functionallity to the system along with beep services to the kernel. 
+ bus_read_register() is called.
+
+9. thread_sleep() is similar to wait() in that the thread has to wait on a signal to be woken back up.
+thread_wakeup() is the signal used to allow a thread to continue with it's process once again.
+The purpose of the argument is to identify the thread that needs to go to sleep.
+
+10. The reason there is no lock_get_holder() function, is because to run any of the condition operations
+the current thread must hold the lock. Therefore, there is no reason to check whether another thread holds the lock
+if the lock_do_i_hold() returns false on the current thread.
