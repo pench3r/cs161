@@ -113,7 +113,11 @@ lock_create(const char *name)
 	}
 	
 	// add stuff here as needed
+
+	struct thread *volatile holder;	
 	
+	lock->holder = NULL;
+
 	return lock;
 }
 
@@ -132,6 +136,21 @@ void
 lock_acquire(struct lock *lock)
 {
 	// Write this
+	if (lock == NULL)
+		panic("Lock is equal to null");
+
+	spl = splhigh();
+
+	if (lock_do_i_hold(lock))
+		panic("Lock %s at %p: Deadlock.\n", lock->name, lock);
+
+	while (lock->holder != NULL) {
+		thread_sleep(lock);
+	}
+
+	lock->holder = curthread;
+
+	splx(spl);
 
 	(void)lock;  // suppress warning until code gets written
 }
@@ -140,8 +159,19 @@ void
 lock_release(struct lock *lock)
 {
 	// Write this
+	if (lock == NULL)
+		panic("Lock is equal to null");
 
-	(void)lock;  // suppress warning until code gets written
+	if (!lock_do_i_hold(lock))
+		panic("Lock %s at %p: Deadlock.\n", lock->name, lock);
+
+	spl = splhigh();
+
+	lock->holder = NULL;
+	
+	thread_wakeup(lock);
+	
+	splx(spl);
 }
 
 int
@@ -149,9 +179,24 @@ lock_do_i_hold(struct lock *lock)
 {
 	// Write this
 
-	(void)lock;  // suppress warning until code gets written
+	int spl;
+	int same;
+	
+	if (lock == NULL)
+		panic("Lock is equal to null");
 
-	return 1;    // dummy until code gets written
+	spl = splhigh();
+
+	if (lock->holder == curthread) {
+		same = 1;
+	} else {
+		same = 0;
+	}
+
+	splx(spl);
+
+	return same;
+
 }
 
 ////////////////////////////////////////////////////////////
