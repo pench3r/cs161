@@ -126,7 +126,7 @@ catlock(void * unusedpointer,
 		mydish = 2;	
 	}
 	
-	kprintf("Cat %d is eating.\n", thiscat);
+	kprintf("Cat %d is eating from dish %d.\n", thiscat, mydish);
 
 	lock_release(mutex);
 
@@ -134,7 +134,7 @@ catlock(void * unusedpointer,
 
 	lock_acquire(mutex);
 
-	kprintf("Cat %d finished eating.\n", thiscat);
+	kprintf("Cat %d finished eating from dish %d.\n", thiscat, mydish);
 	
 	if (mydish == 1) {
 		dish1_busy = 0;
@@ -220,7 +220,7 @@ mouselock(void * unusedpointer,
 		mydish = 2;	
 	}
 	
-	kprintf("Mouse %d is eating.\n", thismouse);
+	kprintf("Mouse %d is eating from dish %d.\n", thismouse, mydish);
 
 	lock_release(mutex);
 
@@ -228,7 +228,7 @@ mouselock(void * unusedpointer,
 
 	lock_acquire(mutex);
 
-	kprintf("Mouse %d finished eating.\n", thismouse);
+	kprintf("Mouse %d finished eating from dish %d.\n", thismouse, mydish);
 	
 	if (mydish == 1) {
 		dish1_busy = 0;

@@ -64,6 +64,8 @@ static volatile int catsDone;
 static volatile int miceWaiting;
 static volatile int miceDone;
 
+static int volatile dish1_busy;
+static int volatile dish2_busy;
 
 
 /*
@@ -92,6 +94,7 @@ catsem(void * unusedpointer,
 
         (void) unusedpointer;
         (void) catnumber;
+	int mydish = 0;
 
 	P(catMutex);
 	catsWaiting++;
@@ -109,7 +112,15 @@ catsem(void * unusedpointer,
 	//Apparently kprintf is not atomic.
 	//If you do not put a mutex on it, two threads can print at the same time.
 	P(mutex);
-	kprintf("\ncat %d is eating", catnumber);
+	if (dish1_busy == 0) {
+		dish1_busy = 1;
+		mydish = 1;
+	}
+	else {
+		dish2_busy = 1;
+		mydish = 2;	
+	}
+	kprintf("\ncat %d is eating from dish %d", catnumber, mydish);
 	V(mutex);
 
 	clocksleep(1);
@@ -117,6 +128,11 @@ catsem(void * unusedpointer,
 	P(catMutex);
 	catsDone++;
 	catsWaiting--;
+	if (mydish == 1) {
+		dish1_busy = 0;
+	} else {
+		dish2_busy = 0;
+	}
 
 	//If you are the second cat to finish
 	//If this is not inside the catMutex, then both cat threads can actually have catsDone=2.
@@ -193,6 +209,7 @@ mousesem(void * unusedpointer,
 
         (void) unusedpointer;
         (void) mousenumber;
+	int mydish = 0;
 	
 	P(mouseMutex);
 	miceWaiting++;
@@ -207,7 +224,15 @@ mousesem(void * unusedpointer,
 	P(mouseSem);
 
 	P(mutex);
-	kprintf("\nmouse %d is eating", mousenumber);
+	if (dish1_busy == 0) {
+		dish1_busy = 1;
+		mydish = 1;
+	}
+	else {
+		dish2_busy = 1;
+		mydish = 2;	
+	}
+	kprintf("\nmouse %d is eating from dish %d", mousenumber, mydish);
 	V(mutex);
 
 	clocksleep(1);
@@ -215,6 +240,11 @@ mousesem(void * unusedpointer,
 	P(mouseMutex);
 	miceDone++;
 	miceWaiting--;
+	if (mydish == 1) {
+		dish1_busy = 0;
+	} else {
+		dish2_busy = 0;
+	}
 	//If this is not inside the mouse mutex, then miceDone can actually be 2 for both mice.
 	//This results in this conditional running twice, which is bad.
 	if (miceDone == 2) {
@@ -303,6 +333,8 @@ catmousesem(int nargs,
 	catsDone = 0;
 	miceWaiting = 0;
 	miceDone = 0;
+	dish1_busy = 0;
+	dish2_busy = 0;
 
         /*
          * Start NCATS catsem() threads.
