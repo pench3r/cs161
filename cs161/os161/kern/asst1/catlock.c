@@ -54,14 +54,13 @@
 /*
  * Global variables
  */
-static struct lock *catmutex;
-static struct lock *mousemutex;
+static struct lock *mutex;
+static struct lock *drivermutex;
 static struct cv *turn_cv;
 static struct cv *done_cv;
 
 // 0) NOCATMOUSE 1) CAT 2) MOUSE
 static volatile int turn_type;
-
 static int volatile cats_wait_count;
 static int volatile mice_wait_count;
 static int volatile cats_in_this_turn;
@@ -70,6 +69,8 @@ static int volatile cats_eat_count;
 static int volatile mice_eat_count;
 static int volatile dish1_busy;
 static int volatile dish2_busy;
+static int volatile cats_total_eat;
+static int volatile mice_total_eat;
 
 /*
  * catlock()
@@ -101,18 +102,20 @@ catlock(void * unusedpointer,
 
 	int mydish = 0;
 
-	lock_acquire(catmutex);
+	lock_acquire(mutex);
 	cats_wait_count++;
 	if (turn_type == 0) {
 		turn_type = 1;
 		cats_in_this_turn = 2;
 	}
 	while (turn_type == 2 || cats_in_this_turn == 0) {
-		cv_wait(turn_cv, catmutex);
+		cv_wait(turn_cv, mutex);
 	}
 	cats_in_this_turn--;
 	cats_eat_count++;
-	kprintf("Cat enters the kitchen.");
+	cats_total_eat++;
+	int thiscat = cats_total_eat;
+	kprintf("Cat %d  enters the kitchen.\n", thiscat);
 	
 	if (dish1_busy == 0) {
 		dish1_busy = 1;
@@ -123,15 +126,15 @@ catlock(void * unusedpointer,
 		mydish = 2;	
 	}
 	
-	kprintf("Cat %d is eating.\n", mydish);
+	kprintf("Cat %d is eating.\n", thiscat);
 
-	lock_release(catmutex);
+	lock_release(mutex);
 
 	clocksleep(1);
 
-	lock_acquire(catmutex);
+	lock_acquire(mutex);
 
-	kprintf("Cat %d finished eating.\n", mydish);
+	kprintf("Cat %d finished eating.\n", thiscat);
 	
 	if (mydish == 1) {
 		dish1_busy = 0;
@@ -142,17 +145,24 @@ catlock(void * unusedpointer,
 	cats_eat_count--;
 	cats_wait_count--;
 
-	if (mice_wait_count > 0) {
-		turn_type = 2;
+	if (mice_wait_count > 0 && cats_eat_count == 0) {
 		mice_in_this_turn = 2;
-		kprintf("It is the mice' turn now.\n");
-	} else if (cats_wait_count > 0) {
+		turn_type = 2;
+		kprintf("It's the mice turn now.\n");
+		cv_broadcast(turn_cv, mutex);
+		lock_release(mutex);
+	} else if (cats_wait_count > 0 && cats_eat_count == 0) {
 		cats_in_this_turn = 2;
-	} else {
+		cv_broadcast(turn_cv, mutex);
+		lock_release(mutex);
+	} else if (cats_wait_count == 0 && mice_wait_count == 0) {
 		turn_type = 0;
+		cv_signal(done_cv, mutex);
+		lock_release(mutex);
+	} else {
+		lock_release(mutex);
 	}
-
-	cv_broadcast(turn_cv, catmutex);
+	return;
 }
 	
 
@@ -186,18 +196,20 @@ mouselock(void * unusedpointer,
 
 	int mydish = 0;
 
-	lock_acquire(mousemutex);
+	lock_acquire(mutex);
 	mice_wait_count++;
 	if (turn_type == 0) {
 		turn_type = 2;
 		mice_in_this_turn = 2;
 	}
 	while (turn_type == 1 || mice_in_this_turn == 0) {
-		cv_wait(turn_cv, mousemutex);
+		cv_wait(turn_cv, mutex);
 	}
 	mice_in_this_turn--;
 	mice_eat_count++;
-	kprintf("Mouse enters the kitchen.\n");
+	mice_total_eat++;
+	int thismouse = mice_total_eat;
+	kprintf("Mouse %d enters the kitchen.\n", thismouse);
 	
 	if (dish1_busy == 0) {
 		dish1_busy = 1;
@@ -208,36 +220,43 @@ mouselock(void * unusedpointer,
 		mydish = 2;	
 	}
 	
-	kprintf("Mouse %d is eating.\n", mydish);
+	kprintf("Mouse %d is eating.\n", thismouse);
 
-	lock_release(mousemutex);
+	lock_release(mutex);
 
 	clocksleep(1);
 
-	lock_acquire(mousemutex);
+	lock_acquire(mutex);
 
-	kprintf("Mouse %d finished eating.\n", mydish);
+	kprintf("Mouse %d finished eating.\n", thismouse);
 	
 	if (mydish == 1) {
 		dish1_busy = 0;
 	} else {
 		dish2_busy = 0;
 	}
-
+	
 	mice_eat_count--;
 	mice_wait_count--;
-
-	if (cats_wait_count > 0) {
+	
+	if (cats_wait_count > 0 && mice_eat_count == 0) {
 		turn_type = 1;
 		cats_in_this_turn = 2;
 		kprintf("It is the cats' turn now.\n");
-	} else if (mice_wait_count > 0) {
+		cv_broadcast(turn_cv, mutex);
+		lock_release(mutex);
+	} else if (mice_wait_count > 0 && mice_eat_count == 0) {
 		mice_in_this_turn = 2;
-	} else {
+		cv_broadcast(turn_cv, mutex);
+		lock_release(mutex);
+	} else if (cats_wait_count == 0 && mice_wait_count == 0) {
 		turn_type = 0;
+		cv_signal(done_cv, mutex);
+		lock_release(mutex);
+	} else {
+		lock_release(mutex);
 	}
-
-	cv_broadcast(turn_cv, mousemutex);
+	return;
 }
 
 
@@ -263,8 +282,8 @@ catmouselock(int nargs,
         int index, error;
    	
 	// Initialize locks and CVs
-	catmutex = lock_create("catlock mutex");
-	mousemutex = lock_create("mouse mutex");
+	mutex = lock_create("catlock and mouselock mutex");
+	drivermutex = lock_create("driver mutex");
 	turn_cv = cv_create("turn cv");
 	done_cv = cv_create("done cv");
 
@@ -276,6 +295,8 @@ catmouselock(int nargs,
 	mice_eat_count = 0;
 	dish1_busy = 0;
 	dish2_busy = 0;
+	cats_total_eat = 0;
+	mice_total_eat = 0;
         /*
          * Avoid unused variable warnings.
          */
@@ -332,6 +353,16 @@ catmouselock(int nargs,
                               );
                 }
         }
+	
+	lock_acquire(mutex);
+	while (cats_total_eat < 6 || mice_total_eat < 2) {
+		cv_wait(done_cv, mutex);
+	}
+	lock_release(mutex);
+	cv_destroy(turn_cv);
+	cv_destroy(done_cv);
+	lock_destroy(mutex);
+	lock_destroy(drivermutex);
 
         return 0;
 }
