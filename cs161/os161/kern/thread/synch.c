@@ -112,10 +112,8 @@ lock_create(const char *name)
 		return NULL;
 	}
 	
-	// add stuff here as needed
+	// add stuff here as needed	
 
-	struct thread *volatile holder;	
-	
 	lock->holder = NULL;
 
 	return lock;
@@ -139,7 +137,7 @@ lock_acquire(struct lock *lock)
 	if (lock == NULL)
 		panic("Lock is equal to null");
 
-	spl = splhigh();
+	int spl = splhigh();
 
 	if (lock_do_i_hold(lock))
 		panic("Lock %s at %p: Deadlock.\n", lock->name, lock);
@@ -165,7 +163,7 @@ lock_release(struct lock *lock)
 	if (!lock_do_i_hold(lock))
 		panic("Lock %s at %p: Deadlock.\n", lock->name, lock);
 
-	spl = splhigh();
+	int spl = splhigh();
 
 	lock->holder = NULL;
 	
@@ -239,23 +237,38 @@ cv_destroy(struct cv *cv)
 void
 cv_wait(struct cv *cv, struct lock *lock)
 {
-	// Write this
-	(void)cv;    // suppress warning until code gets written
-	(void)lock;  // suppress warning until code gets written
+	if (cv == NULL || lock == NULL)
+		panic("cv_wait error: cv or lock == NULL\n");	
+
+	lock_release(lock);
+	int spl = splhigh();
+	thread_sleep(cv);
+	splx(spl);
+	lock_acquire(lock);
 }
 
 void
 cv_signal(struct cv *cv, struct lock *lock)
 {
-	// Write this
-	(void)cv;    // suppress warning until code gets written
-	(void)lock;  // suppress warning until code gets written
+	if (cv == NULL || lock == NULL)
+		panic("cv_signal error: cv or lock == NULL\n");	
+	if (!lock_do_i_hold(lock))
+		panic("cv_signal error: cv %s at %p, lock %s at %p.\n", cv->name, cv, lock->name, lock);
+
+	int spl = splhigh();
+	thread_wakeup(cv);
+	splx(spl);
 }
 
 void
 cv_broadcast(struct cv *cv, struct lock *lock)
 {
-	// Write this
-	(void)cv;    // suppress warning until code gets written
-	(void)lock;  // suppress warning until code gets written
+	if (cv == NULL || lock == NULL)
+		panic("cv_broadcast error: cv or lock == NULL\n");	
+	if (!lock_do_i_hold(lock))
+		panic("cv_broadcast error: cv %s at %p, lock %s at %p.\n", cv->name, cv, lock->name, lock);
+
+	int spl = splhigh();
+	thread_wakeup(cv);
+	splx(spl);
 }
