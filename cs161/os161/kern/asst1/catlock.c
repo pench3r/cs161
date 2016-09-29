@@ -67,6 +67,8 @@ static int volatile cats_in_this_turn;
 static int volatile mice_in_this_turn;
 static int volatile cats_eat_count;
 static int volatile mice_eat_count;
+
+// Dish busy (0, 1)
 static int volatile dish1_busy;
 static int volatile dish2_busy;
 static int volatile cats_total_eat;
@@ -100,23 +102,29 @@ catlock(void * unusedpointer,
         (void) unusedpointer;
         (void) catnumber;
 
+	// Represents the dish used
 	int mydish = 0;
-
+	
 	lock_acquire(mutex);
 	cats_wait_count++;
+
+	// If no one has claimed the bowls, take them
 	if (turn_type == 0) {
 		turn_type = 1;
 		cats_in_this_turn = 2;
 	}
+	// If the mice are using the bowls, wait
 	while (turn_type == 2 || cats_in_this_turn == 0) {
 		cv_wait(turn_cv, mutex);
 	}
+
 	cats_in_this_turn--;
 	cats_eat_count++;
 	cats_total_eat++;
 	int thiscat = cats_total_eat;
 	kprintf("Cat %d  enters the kitchen.\n", thiscat);
 	
+	// Claim your dish
 	if (dish1_busy == 0) {
 		dish1_busy = 1;
 		mydish = 1;
@@ -130,12 +138,14 @@ catlock(void * unusedpointer,
 
 	lock_release(mutex);
 
+	// Eat
 	clocksleep(1);
 
 	lock_acquire(mutex);
 
 	kprintf("Cat %d finished eating from dish %d.\n", thiscat, mydish);
 	
+	// Release your dish
 	if (mydish == 1) {
 		dish1_busy = 0;
 	} else {
@@ -145,16 +155,19 @@ catlock(void * unusedpointer,
 	cats_eat_count--;
 	cats_wait_count--;
 
+	// If mice are waiting and two cats have gone, let the mice go
 	if (mice_wait_count > 0 && cats_eat_count == 0) {
 		mice_in_this_turn = 2;
 		turn_type = 2;
 		kprintf("It's the mice turn now.\n");
 		cv_broadcast(turn_cv, mutex);
 		lock_release(mutex);
+	// If there are still cats waiting and no mice, let the cats have another turn
 	} else if (cats_wait_count > 0 && cats_eat_count == 0) {
 		cats_in_this_turn = 2;
 		cv_broadcast(turn_cv, mutex);
 		lock_release(mutex);
+	// If no one is waiting, signal the done_cv
 	} else if (cats_wait_count == 0 && mice_wait_count == 0) {
 		turn_type = 0;
 		cv_signal(done_cv, mutex);
@@ -194,23 +207,29 @@ mouselock(void * unusedpointer,
         (void) unusedpointer;
         (void) mousenumber;
 
+	// Represents the dish used
 	int mydish = 0;
 
 	lock_acquire(mutex);
 	mice_wait_count++;
+
+	// If no one has claimed the bowls, take them
 	if (turn_type == 0) {
 		turn_type = 2;
 		mice_in_this_turn = 2;
 	}
+	// If the cats are using the bowls, wait
 	while (turn_type == 1 || mice_in_this_turn == 0) {
 		cv_wait(turn_cv, mutex);
 	}
+
 	mice_in_this_turn--;
 	mice_eat_count++;
 	mice_total_eat++;
 	int thismouse = mice_total_eat;
 	kprintf("Mouse %d enters the kitchen.\n", thismouse);
 	
+	// Claim your dish
 	if (dish1_busy == 0) {
 		dish1_busy = 1;
 		mydish = 1;
@@ -223,13 +242,14 @@ mouselock(void * unusedpointer,
 	kprintf("Mouse %d is eating from dish %d.\n", thismouse, mydish);
 
 	lock_release(mutex);
-
+	// Eat
 	clocksleep(1);
 
 	lock_acquire(mutex);
 
 	kprintf("Mouse %d finished eating from dish %d.\n", thismouse, mydish);
 	
+	// Release your dish
 	if (mydish == 1) {
 		dish1_busy = 0;
 	} else {
@@ -239,16 +259,19 @@ mouselock(void * unusedpointer,
 	mice_eat_count--;
 	mice_wait_count--;
 	
+	// If cats are waiting and two mice have gone, let the cats go
 	if (cats_wait_count > 0 && mice_eat_count == 0) {
 		turn_type = 1;
 		cats_in_this_turn = 2;
 		kprintf("It is the cats' turn now.\n");
 		cv_broadcast(turn_cv, mutex);
 		lock_release(mutex);
+	// If there are still cats waiting and no mice, let the cats have another turn
 	} else if (mice_wait_count > 0 && mice_eat_count == 0) {
 		mice_in_this_turn = 2;
 		cv_broadcast(turn_cv, mutex);
 		lock_release(mutex);
+	// If no one is waiting, signal the done_cv
 	} else if (cats_wait_count == 0 && mice_wait_count == 0) {
 		turn_type = 0;
 		cv_signal(done_cv, mutex);
@@ -287,6 +310,7 @@ catmouselock(int nargs,
 	turn_cv = cv_create("turn cv");
 	done_cv = cv_create("done cv");
 
+	// Initialize all global variables
 	cats_wait_count = 0;
 	mice_wait_count = 0;
 	cats_in_this_turn = 0;
@@ -359,6 +383,8 @@ catmouselock(int nargs,
 		cv_wait(done_cv, mutex);
 	}
 	lock_release(mutex);
+	
+	// Clean up by destroying locks and cv's
 	cv_destroy(turn_cv);
 	cv_destroy(done_cv);
 	lock_destroy(mutex);
