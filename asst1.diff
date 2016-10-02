@@ -1,0 +1,699 @@
+diff --git a/codereadingProject3 b/codereadingProject3
+new file mode 100644
+index 0000000..c7ffdd7
+--- /dev/null
++++ b/codereadingProject3
+@@ -0,0 +1,29 @@
++Stephen's Answers:
++1. When a thread exits, priority level for that thread is set to high. Thread vmspace is set to NULL, along with the thread virtual file pointer t_cwd. Thread number is decreased, and then the thread is switched using mi_switch().
++When a thread sleeps, the cpu is yielded to another process. The thread can be woken back up by using thread_wakeup(). 
++
++2. mi_switch(), mips_switch in switch.S? <- check me on this
++
++3. 4, Run, ready, sleep, and zombie.
++
++4. Turning interrupts off means the currently running process cannot be interrupted from whatever it is doing.
++This is accomplished using splhigh() in MIPS. If you do not turn off interrupts in the thread subsystem code, the system can
++end up sleeping forever.
++
++5. The thread is removed from the list of sleeping threads, and set to a runnable state. There is not a gaurantee that 
++the thread will execute, but it is put into the pool of threads requesting CPU time. thread_wakeup() must be called on a sleeping thread for it to be available to run again.
++
++6. scheduler() is responsible for choosing the next thread to run.
++
++7. It picks the next thread from a round-robin style queue.
++
++8. It provides a hardclock functionallity to the system along with beep services to the kernel. 
++ bus_read_register() is called.
++
++9. thread_sleep() is similar to wait() in that the thread has to wait on a signal to be woken back up.
++thread_wakeup() is the signal used to allow a thread to continue with it's process once again.
++The purpose of the argument is to identify the thread that needs to go to sleep.
++
++10. The reason there is no lock_get_holder() function, is because to run any of the condition operations
++the current thread must hold the lock. Therefore, there is no reason to check whether another thread holds the lock
++if the lock_do_i_hold() returns false on the current thread.
+diff --git a/cs161/os161/kern/asst1/.catlock.c.swp b/cs161/os161/kern/asst1/.catlock.c.swp
+new file mode 100644
+index 0000000..9f85817
+Binary files /dev/null and b/cs161/os161/kern/asst1/.catlock.c.swp differ
+diff --git a/cs161/os161/kern/asst1/catlock.c b/cs161/os161/kern/asst1/catlock.c
+index cd3ae6b..470e833 100644
+--- a/cs161/os161/kern/asst1/catlock.c
++++ b/cs161/os161/kern/asst1/catlock.c
+@@ -18,7 +18,7 @@
+ #include <lib.h>
+ #include <test.h>
+ #include <thread.h>
+-
++#include <synch.h>
+ 
+ /*
+  * 
+@@ -51,6 +51,28 @@
+  * 
+  */
+ 
++/*
++ * Global variables
++ */
++static struct lock *mutex;
++static struct lock *drivermutex;
++static struct cv *turn_cv;
++static struct cv *done_cv;
++
++// 0) NOCATMOUSE 1) CAT 2) MOUSE
++static volatile int turn_type;
++static int volatile cats_wait_count;
++static int volatile mice_wait_count;
++static int volatile cats_in_this_turn;
++static int volatile mice_in_this_turn;
++static int volatile cats_eat_count;
++static int volatile mice_eat_count;
++
++// Dish busy (0, 1)
++static int volatile dish1_busy;
++static int volatile dish2_busy;
++static int volatile cats_total_eat;
++static int volatile mice_total_eat;
+ 
+ /*
+  * catlock()
+@@ -79,6 +101,81 @@ catlock(void * unusedpointer,
+ 
+         (void) unusedpointer;
+         (void) catnumber;
++
++	// Represents the dish used
++	int mydish = 0;
++	
++	lock_acquire(mutex);
++	cats_wait_count++;
++
++	// If no one has claimed the bowls, take them
++	if (turn_type == 0) {
++		turn_type = 1;
++		cats_in_this_turn = 2;
++	}
++	// If the mice are using the bowls, wait
++	while (turn_type == 2 || cats_in_this_turn == 0) {
++		cv_wait(turn_cv, mutex);
++	}
++
++	cats_in_this_turn--;
++	cats_eat_count++;
++	cats_total_eat++;
++	int thiscat = cats_total_eat;
++	kprintf("Cat %d  enters the kitchen.\n", thiscat);
++	
++	// Claim your dish
++	if (dish1_busy == 0) {
++		dish1_busy = 1;
++		mydish = 1;
++	}
++	else {
++		dish2_busy = 1;
++		mydish = 2;	
++	}
++	
++	kprintf("Cat %d is eating from dish %d.\n", thiscat, mydish);
++
++	lock_release(mutex);
++
++	// Eat
++	clocksleep(1);
++
++	lock_acquire(mutex);
++
++	kprintf("Cat %d finished eating from dish %d.\n", thiscat, mydish);
++	
++	// Release your dish
++	if (mydish == 1) {
++		dish1_busy = 0;
++	} else {
++		dish2_busy = 0;
++	}
++
++	cats_eat_count--;
++	cats_wait_count--;
++
++	// If mice are waiting and two cats have gone, let the mice go
++	if (mice_wait_count > 0 && cats_eat_count == 0) {
++		mice_in_this_turn = 2;
++		turn_type = 2;
++		kprintf("It's the mice turn now.\n");
++		cv_broadcast(turn_cv, mutex);
++		lock_release(mutex);
++	// If there are still cats waiting and no mice, let the cats have another turn
++	} else if (cats_wait_count > 0 && cats_eat_count == 0) {
++		cats_in_this_turn = 2;
++		cv_broadcast(turn_cv, mutex);
++		lock_release(mutex);
++	// If no one is waiting, signal the done_cv
++	} else if (cats_wait_count == 0 && mice_wait_count == 0) {
++		turn_type = 0;
++		cv_signal(done_cv, mutex);
++		lock_release(mutex);
++	} else {
++		lock_release(mutex);
++	}
++	return;
+ }
+ 	
+ 
+@@ -109,6 +206,80 @@ mouselock(void * unusedpointer,
+         
+         (void) unusedpointer;
+         (void) mousenumber;
++
++	// Represents the dish used
++	int mydish = 0;
++
++	lock_acquire(mutex);
++	mice_wait_count++;
++
++	// If no one has claimed the bowls, take them
++	if (turn_type == 0) {
++		turn_type = 2;
++		mice_in_this_turn = 2;
++	}
++	// If the cats are using the bowls, wait
++	while (turn_type == 1 || mice_in_this_turn == 0) {
++		cv_wait(turn_cv, mutex);
++	}
++
++	mice_in_this_turn--;
++	mice_eat_count++;
++	mice_total_eat++;
++	int thismouse = mice_total_eat;
++	kprintf("Mouse %d enters the kitchen.\n", thismouse);
++	
++	// Claim your dish
++	if (dish1_busy == 0) {
++		dish1_busy = 1;
++		mydish = 1;
++	}
++	else {
++		dish2_busy = 1;
++		mydish = 2;	
++	}
++	
++	kprintf("Mouse %d is eating from dish %d.\n", thismouse, mydish);
++
++	lock_release(mutex);
++	// Eat
++	clocksleep(1);
++
++	lock_acquire(mutex);
++
++	kprintf("Mouse %d finished eating from dish %d.\n", thismouse, mydish);
++	
++	// Release your dish
++	if (mydish == 1) {
++		dish1_busy = 0;
++	} else {
++		dish2_busy = 0;
++	}
++	
++	mice_eat_count--;
++	mice_wait_count--;
++	
++	// If cats are waiting and two mice have gone, let the cats go
++	if (cats_wait_count > 0 && mice_eat_count == 0) {
++		turn_type = 1;
++		cats_in_this_turn = 2;
++		kprintf("It is the cats' turn now.\n");
++		cv_broadcast(turn_cv, mutex);
++		lock_release(mutex);
++	// If there are still cats waiting and no mice, let the cats have another turn
++	} else if (mice_wait_count > 0 && mice_eat_count == 0) {
++		mice_in_this_turn = 2;
++		cv_broadcast(turn_cv, mutex);
++		lock_release(mutex);
++	// If no one is waiting, signal the done_cv
++	} else if (cats_wait_count == 0 && mice_wait_count == 0) {
++		turn_type = 0;
++		cv_signal(done_cv, mutex);
++		lock_release(mutex);
++	} else {
++		lock_release(mutex);
++	}
++	return;
+ }
+ 
+ 
+@@ -132,7 +303,24 @@ catmouselock(int nargs,
+              char ** args)
+ {
+         int index, error;
+-   
++   	
++	// Initialize locks and CVs
++	mutex = lock_create("catlock and mouselock mutex");
++	drivermutex = lock_create("driver mutex");
++	turn_cv = cv_create("turn cv");
++	done_cv = cv_create("done cv");
++
++	// Initialize all global variables
++	cats_wait_count = 0;
++	mice_wait_count = 0;
++	cats_in_this_turn = 0;
++	mice_in_this_turn = 0;
++	cats_eat_count = 0;
++	mice_eat_count = 0;
++	dish1_busy = 0;
++	dish2_busy = 0;
++	cats_total_eat = 0;
++	mice_total_eat = 0;
+         /*
+          * Avoid unused variable warnings.
+          */
+@@ -189,6 +377,18 @@ catmouselock(int nargs,
+                               );
+                 }
+         }
++	
++	lock_acquire(mutex);
++	while (cats_total_eat < 6 || mice_total_eat < 2) {
++		cv_wait(done_cv, mutex);
++	}
++	lock_release(mutex);
++	
++	// Clean up by destroying locks and cv's
++	cv_destroy(turn_cv);
++	cv_destroy(done_cv);
++	lock_destroy(mutex);
++	lock_destroy(drivermutex);
+ 
+         return 0;
+ }
+diff --git a/cs161/os161/kern/asst1/catsem.c b/cs161/os161/kern/asst1/catsem.c
+index dcb257b..29dbe22 100644
+--- a/cs161/os161/kern/asst1/catsem.c
++++ b/cs161/os161/kern/asst1/catsem.c
+@@ -18,6 +18,7 @@
+ #include <lib.h>
+ #include <test.h>
+ #include <thread.h>
++#include <synch.h>
+ 
+ 
+ /*
+@@ -51,6 +52,21 @@
+  * 
+  */
+ 
++static struct semaphore	*finish;
++static struct semaphore	*catMutex; 
++static struct semaphore	*mouseMutex; 
++static struct semaphore	*catSem;
++static struct semaphore	*mouseSem;
++static struct semaphore	*mutex;
++
++static volatile int catsWaiting;
++static volatile int catsDone;
++static volatile int miceWaiting;
++static volatile int miceDone;
++
++static int volatile dish1_busy;
++static int volatile dish2_busy;
++
+ 
+ /*
+  * catsem()
+@@ -78,7 +94,92 @@ catsem(void * unusedpointer,
+ 
+         (void) unusedpointer;
+         (void) catnumber;
++	int mydish = 0;
++
++	P(catMutex);
++	catsWaiting++;
++	V(catMutex);
++
++	//This allows cats into the kitchen if mice are not waiting yet.
++	if (miceWaiting < 1 && catsWaiting < 2) {
++		V(catSem);
++		V(catSem);
++	}
++	
++	
++	P(catSem);
++
++	//Apparently kprintf is not atomic.
++	//If you do not put a mutex on it, two threads can print at the same time.
++	P(mutex);
++	if (dish1_busy == 0) {
++		dish1_busy = 1;
++		mydish = 1;
++	}
++	else {
++		dish2_busy = 1;
++		mydish = 2;	
++	}
++	kprintf("\ncat %d is eating from dish %d", catnumber, mydish);
++	V(mutex);
++
++	clocksleep(1);
++
++	P(catMutex);
++	catsDone++;
++	catsWaiting--;
++	if (mydish == 1) {
++		dish1_busy = 0;
++	} else {
++		dish2_busy = 0;
++	}
++
++	//If you are the second cat to finish
++	//If this is not inside the catMutex, then both cat threads can actually have catsDone=2.
++	//We only want it to run when the second cat leaves, so we include the mutex.
++	if (catsDone == 2) {
++		V(catMutex);
++		P(mutex);
++		kprintf("\ncat %d left the kitchen", catnumber);
++		V(mutex);
++		//Prioritize mice, this will always allow mice to enter after two cats have gone.
++		if (miceWaiting > 0) {
++			//Signal two mice
++			V(mouseSem);
++			V(mouseSem);
++
++			P(catMutex);
++			catsDone = 0;
++			V(catMutex);
++		}
++		else if (catsWaiting > 0){
++			P(catMutex);
++			catsDone = 0;
++			V(catMutex);
++
++			//Signal two more cats
++			V(catSem);
++			V(catSem);
++		}	
++		
++	}
++	//The first cat leaves
++	else { 
++		V(catMutex);
++		P(mutex);
++		kprintf("\ncat %d left the kitchen", catnumber);
++		V(mutex);
++	}
++	//Check if the program is over
++	if (catsWaiting == 0 && miceWaiting == 0) {
++		//This mutex is so the program doesn't decide to finish while the final message is printing
++		P(mutex);
++		V(finish);
++		V(mutex);
++	}
++		
+ }
++
+         
+ 
+ /*
+@@ -108,6 +209,70 @@ mousesem(void * unusedpointer,
+ 
+         (void) unusedpointer;
+         (void) mousenumber;
++	int mydish = 0;
++	
++	P(mouseMutex);
++	miceWaiting++;
++	V(mouseMutex);
++
++	//This allows mice into the kitchen, if cats are not waiting yet.
++	if (catsWaiting < 1 && miceWaiting < 2) {
++		V(mouseSem);
++		V(mouseSem);
++	}
++
++	P(mouseSem);
++
++	P(mutex);
++	if (dish1_busy == 0) {
++		dish1_busy = 1;
++		mydish = 1;
++	}
++	else {
++		dish2_busy = 1;
++		mydish = 2;	
++	}
++	kprintf("\nmouse %d is eating from dish %d", mousenumber, mydish);
++	V(mutex);
++
++	clocksleep(1);
++
++	P(mouseMutex);
++	miceDone++;
++	miceWaiting--;
++	if (mydish == 1) {
++		dish1_busy = 0;
++	} else {
++		dish2_busy = 0;
++	}
++	//If this is not inside the mouse mutex, then miceDone can actually be 2 for both mice.
++	//This results in this conditional running twice, which is bad.
++	if (miceDone == 2) {
++		miceDone = 0;
++		V(mouseMutex);
++		P(mutex);
++		kprintf("\nmouse %d left the kitchen", mousenumber);
++		V(mutex);
++		
++		//Signal two cats
++		V(catSem);
++		V(catSem);
++	}
++	//The first mouse leaves
++	else { 
++		V(mouseMutex);
++		P(mutex);
++		kprintf("\nmouse %d left the kitchen", mousenumber);
++		V(mutex);
++	}
++	//Check if the program is done
++	if (catsWaiting == 0 && miceWaiting == 0) {
++		//This mutex is so the program doesn't decide to finish while the final message is printing
++		P(mutex);
++		V(finish);
++		V(mutex);
++	}
++
+ }
+ 
+ 
+@@ -139,9 +304,42 @@ catmousesem(int nargs,
+         (void) nargs;
+         (void) args;
+    
++	catMutex = sem_create("catMutex", 1); //= 1
++	if (catMutex == NULL)
++		panic("catMutex: Out of memory.\n");
++
++	mouseMutex = sem_create("mouseMutex", 1); //= 1
++	if (mouseMutex == NULL)
++		panic("mouseMutex: Out of memory.\n");
++
++	catSem = sem_create("catSem", 0); //= 0;
++	if (catSem == NULL)
++		panic("catSem: Out of memory.\n");
++
++	mouseSem = sem_create("mouseSem", 0);
++	if (mouseSem == NULL)
++		panic("mouseSem: Out of memory.\n");
++
++	mutex = sem_create("mutex", 1);
++	if (mutex == NULL)
++		panic("mutex: Out of memory.\n");
++
++	finish = sem_create("finish", 0);
++	if (finish == NULL)
++		panic("finish: Out of memory.\n");
++
++
++	catsWaiting = 0;
++	catsDone = 0;
++	miceWaiting = 0;
++	miceDone = 0;
++	dish1_busy = 0;
++	dish2_busy = 0;
++
+         /*
+          * Start NCATS catsem() threads.
+          */
++	
+ 
+         for (index = 0; index < NCATS; index++) {
+            
+@@ -188,6 +386,17 @@ catmousesem(int nargs,
+                               );
+                 }
+         }
++	//Add cleanup here
++
++	P(finish);
++	kprintf("\n");
++	sem_destroy(mouseMutex);
++	sem_destroy(catMutex);
++	sem_destroy(mouseSem);
++	sem_destroy(catSem);
++	sem_destroy(mutex);
++	sem_destroy(finish);
++	
+ 
+         return 0;
+ }
+diff --git a/cs161/os161/kern/include/synch.h b/cs161/os161/kern/include/synch.h
+index 3583e78..feddea8 100644
+--- a/cs161/os161/kern/include/synch.h
++++ b/cs161/os161/kern/include/synch.h
+@@ -52,6 +52,7 @@ struct lock {
+ 	char *name;
+ 	// add what you need here
+ 	// (don't forget to mark things volatile as needed)
++	struct thread *volatile holder;
+ };
+ 
+ struct lock *lock_create(const char *name);
+diff --git a/cs161/os161/kern/thread/.synch.c.swp b/cs161/os161/kern/thread/.synch.c.swp
+new file mode 100644
+index 0000000..6327189
+Binary files /dev/null and b/cs161/os161/kern/thread/.synch.c.swp differ
+diff --git a/cs161/os161/kern/thread/synch.c b/cs161/os161/kern/thread/synch.c
+index cdc47a3..9153808 100644
+--- a/cs161/os161/kern/thread/synch.c
++++ b/cs161/os161/kern/thread/synch.c
+@@ -112,8 +112,10 @@ lock_create(const char *name)
+ 		return NULL;
+ 	}
+ 	
+-	// add stuff here as needed
+-	
++	// add stuff here as needed	
++
++	lock->holder = NULL;
++
+ 	return lock;
+ }
+ 
+@@ -132,6 +134,21 @@ void
+ lock_acquire(struct lock *lock)
+ {
+ 	// Write this
++	if (lock == NULL)
++		panic("Lock is equal to null");
++
++	int spl = splhigh();
++
++	if (lock_do_i_hold(lock))
++		panic("Lock %s at %p: Deadlock.\n", lock->name, lock);
++
++	while (lock->holder != NULL) {
++		thread_sleep(lock);
++	}
++
++	lock->holder = curthread;
++
++	splx(spl);
+ 
+ 	(void)lock;  // suppress warning until code gets written
+ }
+@@ -140,8 +157,19 @@ void
+ lock_release(struct lock *lock)
+ {
+ 	// Write this
++	if (lock == NULL)
++		panic("Lock is equal to null");
+ 
+-	(void)lock;  // suppress warning until code gets written
++	if (!lock_do_i_hold(lock))
++		panic("Lock %s at %p: Deadlock.\n", lock->name, lock);
++
++	int spl = splhigh();
++
++	lock->holder = NULL;
++	
++	thread_wakeup(lock);
++	
++	splx(spl);
+ }
+ 
+ int
+@@ -149,9 +177,24 @@ lock_do_i_hold(struct lock *lock)
+ {
+ 	// Write this
+ 
+-	(void)lock;  // suppress warning until code gets written
++	int spl;
++	int same;
++	
++	if (lock == NULL)
++		panic("Lock is equal to null");
++
++	spl = splhigh();
++
++	if (lock->holder == curthread) {
++		same = 1;
++	} else {
++		same = 0;
++	}
++
++	splx(spl);
++
++	return same;
+ 
+-	return 1;    // dummy until code gets written
+ }
+ 
+ ////////////////////////////////////////////////////////////
+@@ -194,23 +237,38 @@ cv_destroy(struct cv *cv)
+ void
+ cv_wait(struct cv *cv, struct lock *lock)
+ {
+-	// Write this
+-	(void)cv;    // suppress warning until code gets written
+-	(void)lock;  // suppress warning until code gets written
++	if (cv == NULL || lock == NULL)
++		panic("cv_wait error: cv or lock == NULL\n");	
++
++	lock_release(lock);
++	int spl = splhigh();
++	thread_sleep(cv);
++	splx(spl);
++	lock_acquire(lock);
+ }
+ 
+ void
+ cv_signal(struct cv *cv, struct lock *lock)
+ {
+-	// Write this
+-	(void)cv;    // suppress warning until code gets written
+-	(void)lock;  // suppress warning until code gets written
++	if (cv == NULL || lock == NULL)
++		panic("cv_signal error: cv or lock == NULL\n");	
++	if (!lock_do_i_hold(lock))
++		panic("cv_signal error: cv %s at %p, lock %s at %p.\n", cv->name, cv, lock->name, lock);
++
++	int spl = splhigh();
++	thread_wakeup(cv);
++	splx(spl);
+ }
+ 
+ void
+ cv_broadcast(struct cv *cv, struct lock *lock)
+ {
+-	// Write this
+-	(void)cv;    // suppress warning until code gets written
+-	(void)lock;  // suppress warning until code gets written
++	if (cv == NULL || lock == NULL)
++		panic("cv_broadcast error: cv or lock == NULL\n");	
++	if (!lock_do_i_hold(lock))
++		panic("cv_broadcast error: cv %s at %p, lock %s at %p.\n", cv->name, cv, lock->name, lock);
++
++	int spl = splhigh();
++	thread_wakeup(cv);
++	splx(spl);
+ }
