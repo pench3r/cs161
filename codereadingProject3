@@ -1,8 +1,8 @@
-Stephen's Answers:
+Stephen's Answers(Teams chosen answers):
 1. When a thread exits, priority level for that thread is set to high. Thread vmspace is set to NULL, along with the thread virtual file pointer t_cwd. Thread number is decreased, and then the thread is switched using mi_switch().
 When a thread sleeps, the cpu is yielded to another process. The thread can be woken back up by using thread_wakeup(). 
 
-2. mi_switch(), mips_switch in switch.S? <- check me on this
+2. mi_switch()
 
 3. 4, Run, ready, sleep, and zombie.
 
@@ -27,3 +27,21 @@ The purpose of the argument is to identify the thread that needs to go to sleep.
 10. The reason there is no lock_get_holder() function, is because to run any of the condition operations
 the current thread must hold the lock. Therefore, there is no reason to check whether another thread holds the lock
 if the lock_do_i_hold() returns false on the current thread.
+
+Michael's Answers
+1. disables interrupts, then sets the curthread t_vmspace pointer to null and calls the as_destroy function on the old address of curthread t_vmspace to do garbage collection. then it sets the curthread t_cwd to null as well. then checks that the number of threads is greater than 0 and if so decrements the number of threads running. then sets the context of the current thread to S_ZOMB to make it a zombie
+2. mi_switch
+3. 4 states
+    1. S_READY
+    2. S_RUN
+    3. S_SLEEP
+    4. S_ZOMB
+4. to turn off interrupts means that the current thread will not be able to be interrupted, this is done by calling the function splhigh() to set the interrupts to the highest level therefore disabling them. this is important because interrupts must be off for a thread to be able to sleep and wake back up again
+5. when a thread wakes up another thread it calls thread_wakeup(), it loops through the array of sleeping threads held by os161 and checks for threads that are sleeping with the sleepaddr that is that same as the addr that is passed into the thread_wakeup() function. it is then removed from the sleepers queue then the function make_runnable is called on the thread that is waking up to get it started again
+6. scheduler()
+7. takes the next function from the run queue
+8. cpu_idle is called if there are no threads waiting which requires the hardware clock
+9. when the semaphore waits on its counter it calls thread_sleep() to sleep the thread with the address of the semaphore sent as the address that the thread will sleep at. when the semaphore signals it uses the thread_wakeup() function to wakeup a thread with the address of the semaphore as its sleep address so that the thread can use the newly available resource
+10. because we don’t care who else holds the lock as long as we know that we do or don’t have it. if we don’t have it we can’t do anything with it, but if we do have it then we can lock or unlock it and use it to get through to critical sections
+
+
