@@ -128,10 +128,12 @@ dumbvm.o: ../../arch/mips/mips/dumbvm.c ../../include/types.h \
   machine/tlb.h
 catlock.o: ../../asst1/catlock.c ../../include/types.h machine/types.h \
   ../../include/kern/types.h ../../include/lib.h machine/setjmp.h \
-  ../../include/test.h ../../include/thread.h machine/pcb.h
+  ../../include/test.h ../../include/thread.h machine/pcb.h \
+  ../../include/synch.h
 catsem.o: ../../asst1/catsem.c ../../include/types.h machine/types.h \
   ../../include/kern/types.h ../../include/lib.h machine/setjmp.h \
-  ../../include/test.h ../../include/thread.h machine/pcb.h
+  ../../include/test.h ../../include/thread.h machine/pcb.h \
+  ../../include/synch.h
 cache_mips1.o: ../../arch/mips/mips/cache_mips1.S machine/asmdefs.h
 exception.o: ../../arch/mips/mips/exception.S machine/asmdefs.h \
   machine/specialreg.h
