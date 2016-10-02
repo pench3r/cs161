@@ -45,8 +45,6 @@
 
 #define NMICE 2
 
-typedef int bool;
-enum {false, true};
 
 /*
  * 
@@ -55,15 +53,17 @@ enum {false, true};
  */
 
 static struct semaphore	*finish;
-static struct semaphore	*catMutex; //= 1
-static struct semaphore	*mouseMutex; //= 1
-static struct semaphore	*bowlsAvailable;// = 1;
-static struct semaphore	*catSem; //= 0;
+static struct semaphore	*catMutex; 
+static struct semaphore	*mouseMutex; 
+static struct semaphore	*catSem;
 static struct semaphore	*mouseSem;
-static struct semaphore	*kitchenSem;
+static struct semaphore	*mutex;
 
 static volatile int catsWaiting;
+static volatile int catsDone;
 static volatile int miceWaiting;
+static volatile int miceDone;
+
 
 
 /*
@@ -95,30 +95,74 @@ catsem(void * unusedpointer,
 
 	P(catMutex);
 	catsWaiting++;
-	if (catsWaiting == 1)
-		P(kitchenSem);
-	catsInThisTurn++;	
 	V(catMutex);
 
+	//This allows cats into the kitchen if mice are not waiting yet.
+	if (miceWaiting < 1 && catsWaiting < 2) {
+		V(catSem);
+		V(catSem);
+	}
+	
+	
+	P(catSem);
+
+	//Apparently kprintf is not atomic.
+	//If you do not put a mutex on it, two threads can print at the same time.
+	P(mutex);
+	kprintf("\ncat %d is eating", catnumber);
+	V(mutex);
 
 	clocksleep(1);
 
 	P(catMutex);
+	catsDone++;
 	catsWaiting--;
-	catsInThisTurn--;
-	if (miceWaiting > 0 && catsInThisTurn == 0) {
-		miceInThisTurn = 2;
-		V(kitchenSem);
+
+	//If you are the second cat to finish
+	//If this is not inside the catMutex, then both cat threads can actually have catsDone=2.
+	//We only want it to run when the second cat leaves, so we include the mutex.
+	if (catsDone == 2) {
+		V(catMutex);
+		P(mutex);
+		kprintf("\ncat %d left the kitchen", catnumber);
+		V(mutex);
+		//Prioritize mice, this will always allow mice to enter after two cats have gone.
+		if (miceWaiting > 0) {
+			//Signal two mice
+			V(mouseSem);
+			V(mouseSem);
+
+			P(catMutex);
+			catsDone = 0;
+			V(catMutex);
+		}
+		else if (catsWaiting > 0){
+			P(catMutex);
+			catsDone = 0;
+			V(catMutex);
+
+			//Signal two more cats
+			V(catSem);
+			V(catSem);
+		}	
+		
 	}
-	else if (catsWaiting > 0) {
-		catsInThisTurn = 2;
-		V(catSem);
-	} else {
+	//The first cat leaves
+	else { 
+		V(catMutex);
+		P(mutex);
+		kprintf("\ncat %d left the kitchen", catnumber);
+		V(mutex);
+	}
+	//Check if the program is over
+	if (catsWaiting == 0 && miceWaiting == 0) {
+		//This mutex is so the program doesn't decide to finish while the final message is printing
+		P(mutex);
 		V(finish);
+		V(mutex);
 	}
-	V(catMutex);
 		
-		
+}
 
         
 
@@ -150,103 +194,54 @@ mousesem(void * unusedpointer,
         (void) unusedpointer;
         (void) mousenumber;
 	
+	P(mouseMutex);
+	miceWaiting++;
+	V(mouseMutex);
 
-	int mydish;
-	bool first_mouse_eat = false;
-	bool another_mouse_eat = false;
+	//This allows mice into the kitchen, if cats are not waiting yet.
+	if (catsWaiting < 1 && miceWaiting < 2) {
+		V(mouseSem);
+		V(mouseSem);
+	}
+
+	P(mouseSem);
 
 	P(mutex);
-	if (all_dishes_available == true) {
-		all_dishes_available = false;
-		V(mouse_queue);
-	}
-	mouse_wait_count++;
-	V(mutex);
-
-	P(mouse_queue);
-	if (no_mouse_eat = true) {
-		no_mouse_eat = false;
-		first_mouse_eat = true;
-	}
-	else first_mouse_eat = false;
-
-	if (first_mouse_eat == true) {
-		P(mutex);
-		if (mouse_wait_count > 1) {
-			another_mouse_eat = true;
-			V(mouse_queue);
-		}
-		V(mutex);
-	}
-
-	P(mutex);
-	kprintf("Mouse %d in the kitchen.\n", mousenumber);
-	V(mutex);
-
-	P(dish_mutex);
-	if (dish1_busy == false) {
-		dish1_busy = true;
-		mydish = 1;
-	}
-	else {
-		if (dish2_busy == true)
-			panic("Dish2_busy == true!");
-		dish2_busy = true;
-		mydish = 2;
-	}
-	V(dish_mutex);
-
-	P(mutex);
-	kprintf("Mouse eating.\n");
+	kprintf("\nmouse %d is eating", mousenumber);
 	V(mutex);
 
 	clocksleep(1);
 
-	P(mutex);
-	kprintf("Finish eating.\n");
-	V(mutex);
-
-
-	//Release dishes
-	P(dish_mutex);
-	if (mydish == 1)
-		dish1_busy = false;
-	else 
-		dish2_busy = false;
-	V(dish_mutex);
-	
-	P(mutex);
-	mouse_wait_count--;
-	V(mutex);
-
-	if (first_mouse_eat == true) {
-		if (another_mouse_eat == true)
-			P(done);
-
+	P(mouseMutex);
+	miceDone++;
+	miceWaiting--;
+	//If this is not inside the mouse mutex, then miceDone can actually be 2 for both mice.
+	//This results in this conditional running twice, which is bad.
+	if (miceDone == 2) {
+		miceDone = 0;
+		V(mouseMutex);
 		P(mutex);
-		kprintf("First mouse is leaving.\n");
+		kprintf("\nmouse %d left the kitchen", mousenumber);
 		V(mutex);
-
-		no_mouse_eat = true;
-
+		
+		//Signal two cats
+		V(catSem);
+		V(catSem);
+	}
+	//The first mouse leaves
+	else { 
+		V(mouseMutex);
 		P(mutex);
-		if(mouse_wait_count > 0) 
-			V(mouse_queue);
-		else if(cats_wait_count > 0)
-			V(cats_queue);
-		else  {
-			all_dishes_available = true;
-			V(finish);
-		}
+		kprintf("\nmouse %d left the kitchen", mousenumber);
 		V(mutex);
 	}
-	else {
+	//Check if the program is done
+	if (catsWaiting == 0 && miceWaiting == 0) {
+		//This mutex is so the program doesn't decide to finish while the final message is printing
 		P(mutex);
-		kprintf("Second mouse is leaving\n");
+		V(finish);
 		V(mutex);
-		V(done);
 	}
-	
 
 }
 
@@ -279,20 +274,40 @@ catmousesem(int nargs,
         (void) nargs;
         (void) args;
    
-	finish = sem_create("finish", 0);
 	catMutex = sem_create("catMutex", 1); //= 1
+	if (catMutex == NULL)
+		panic("catMutex: Out of memory.\n");
+
 	mouseMutex = sem_create("mouseMutex", 1); //= 1
-	bowlsAvailable  = sem_create("bowlsAvailable", 2); // = 1;
+	if (mouseMutex == NULL)
+		panic("mouseMutex: Out of memory.\n");
+
 	catSem = sem_create("catSem", 0); //= 0;
+	if (catSem == NULL)
+		panic("catSem: Out of memory.\n");
+
 	mouseSem = sem_create("mouseSem", 0);
-	kitchenSem = sem_create("kitchenSem", 1);
+	if (mouseSem == NULL)
+		panic("mouseSem: Out of memory.\n");
+
+	mutex = sem_create("mutex", 1);
+	if (mutex == NULL)
+		panic("mutex: Out of memory.\n");
+
+	finish = sem_create("finish", 0);
+	if (finish == NULL)
+		panic("finish: Out of memory.\n");
+
 
 	catsWaiting = 0;
+	catsDone = 0;
 	miceWaiting = 0;
+	miceDone = 0;
 
         /*
          * Start NCATS catsem() threads.
          */
+	
 
         for (index = 0; index < NCATS; index++) {
            
@@ -342,6 +357,13 @@ catmousesem(int nargs,
 	//Add cleanup here
 
 	P(finish);
+	kprintf("\n");
+	sem_destroy(mouseMutex);
+	sem_destroy(catMutex);
+	sem_destroy(mouseSem);
+	sem_destroy(catSem);
+	sem_destroy(mutex);
+	sem_destroy(finish);
 	
 
         return 0;
