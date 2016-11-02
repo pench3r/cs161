@@ -71,6 +71,9 @@ mips_syscall(struct trapframe *tf)
 	    case SYS_reboot:
 		err = sys_reboot(tf->tf_a0);
 		break;
+	    case SYS_getpid:
+		err = sys_getpid(&retval);
+		break;
 
 	    /* Add stuff here */
  
