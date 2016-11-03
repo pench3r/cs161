@@ -13,6 +13,9 @@
 #include "file.h"
 
 int sys_open(const char *path, int oflag, int *retfd) {
+
+	filetable_init();
+
 	int err = 0;
 	struct vnode *vn = {0};	
 	err = vfs_open(&path, oflag, &vn);
@@ -40,6 +43,9 @@ int sys_open(const char *path, int oflag, int *retfd) {
 }
 
 int sys_read(int fd, void *buf, size_t nbytes){
+	if (curthread->openfileTable[fd] == NULL) 
+		filetable_init();
+
 	if(fd < 0 || fd > MAX_FILETABLE_LENGTH || curthread->openfileTable[fd] == NULL) {
 		return EBADF;
 	}
@@ -54,6 +60,9 @@ int sys_read(int fd, void *buf, size_t nbytes){
 }
 
 int sys_write(int fd, const void *buf, size_t nbytes){
+	if (curthread->openfileTable[fd] == NULL) 
+		filetable_init();
+
 	if(fd <  0 || fd > MAX_FILETABLE_LENGTH || curthread->openfileTable[fd] == NULL) {
 		return EBADF;
 	}	
@@ -184,4 +193,119 @@ int sys_dup2(int oldfd, int newfd) {
 	lock_release(ofile->vnode_lock);
 
 	return newfd;
+}
+
+/*
+ * We were told not to implement STDIN STOUT and STER by QIN but we realized
+ * it was actually needed. Having no idea how to implement this, we found a reference online.
+ * @seanbriceland on github.com
+ *
+ * initializes a filetable with stdin, stdout, stderr defaults at 0,1,2
+ *
+ * Returns 0 on success, error code on failure
+ */
+int filetable_init(){
+	int err;
+	char con1[5] = "con:";
+
+	struct vnode *vn1, *vn2, *vn3;
+
+	/////////////////////////////////////////////
+	//stdin
+	struct openfile *ofile1;
+	ofile1 = kmalloc(sizeof(struct openfile));
+	if (ofile1 == NULL)
+		return ENOMEM;
+
+	err = vfs_open(con1, O_RDONLY, &vn1);
+	if(err)
+		return err;
+
+	ofile1->vnode_ptr = vn1;
+	ofile1->mode = O_RDONLY;
+	
+	ofile1->ref_count = 1;
+	ofile1->offset = 0;
+	
+	ofile1->vnode_lock = lock_create("of_lock");
+	if (ofile1->vnode_lock == NULL)
+		return ENOMEM;
+
+
+	curthread->openfileTable[0] = ofile1;
+
+	strcpy(con1, "con:"); //reinitilize con
+	/////////////////////////////////////////////
+	//stdout..
+	err = vfs_open(con1, O_WRONLY, &vn2);//TODO vnode?
+	if (err)
+		return err;
+
+	struct openfile *ofile2;
+	ofile2 = kmalloc(sizeof(struct openfile));
+	if (ofile2 == NULL)
+		return ENOMEM;
+
+	ofile2->vnode_ptr = vn1;
+	ofile2->mode = O_WRONLY;
+	
+	ofile2->ref_count = 1;
+	ofile2->offset = 0;
+	
+	ofile2->vnode_lock = lock_create("of_lock");
+	if (ofile2->vnode_lock == NULL)
+		return ENOMEM;
+
+	curthread->openfileTable[1] = ofile2;
+
+	strcpy(con1, "con:"); //reinitilize con
+	/////////////////////////////////////////////
+	//stderr...
+	err = vfs_open(con1, O_WRONLY, &vn3);
+	if (err)
+		return err;
+	
+	struct openfile *ofile3;
+	ofile3 = kmalloc(sizeof(struct openfile));
+	if (ofile3 == NULL)
+		return ENOMEM;
+
+	ofile3->vnode_ptr = vn1;
+	ofile3->mode = O_WRONLY;
+	
+	ofile3->ref_count = 1;
+	ofile3->offset = 0;
+	
+	ofile3->vnode_lock = lock_create("of_lock");
+	if (ofile3->vnode_lock == NULL)
+		return ENOMEM;
+
+	curthread->openfileTable[2] = ofile3;
+
+	return 0; 
+}
+
+/**
+ * add_filehandle
+ * finds the next NULL entry in the filetable
+ * sets the ofile to this entry
+ * 
+ * ON SUCCESS:
+ * return the index where we stored the of_ptr.
+ *
+ * ON FAILURE:
+ * set err
+ */
+int add_filehandle(struct openfile* ofile)
+{
+	int fd=3;
+	for(; fd<MAX_FILETABLE_LENGTH; fd++)
+	{
+		if(curthread->openfileTable[fd] == NULL)
+		{
+			curthread->openfileTable[fd] = ofile;
+			return fd;
+		}
+	}
+	return -1; // if this function reaches this line then the file table is full!
 }

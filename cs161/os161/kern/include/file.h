@@ -14,4 +14,6 @@ typedef struct openfile{
 
 } openfile;
 
+int filetable_init(void);
+int add_filehandle(openfile * ofile);
 #endif //FILE_H

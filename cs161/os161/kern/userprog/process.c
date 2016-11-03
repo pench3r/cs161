@@ -204,6 +204,7 @@ pid_t proc_init(struct thread* t) {
 	p->exitcode = -1;
 	p->exited = 0;
 	p->self = t;
+	p->wait_cv = cv_create("process_cv");
 	p->lock_proc = lock_create("process_lock");
 	pid = add_proc(p);
 	if(pid < 0)
