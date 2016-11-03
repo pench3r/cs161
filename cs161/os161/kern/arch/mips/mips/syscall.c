@@ -50,6 +50,8 @@ mips_syscall(struct trapframe *tf)
 {
 	int callno;
 	int32_t retval;
+	off_t pos = 0;
+	int whence;
 	int err;
 
 	assert(curspl==0);
@@ -72,16 +74,32 @@ mips_syscall(struct trapframe *tf)
 		err = sys_reboot(tf->tf_a0);
 		break;
 	    case SYS_open:
-		err = sys_open((const char*)tf->tf_a0, tf->tf_a1);
+		err = sys_open((const char*)tf->tf_a0, tf->tf_a1, &retval);
 		break;
 	    case SYS_close:
 		err = sys_close((int)tf->tf_a0);
 		break;
 	    case SYS_write:
-		kprintf("hello");
+		err = sys_write((int)tf->tf_a0, (const void*)tf->tf_a1, (size_t) tf->tf_a2);
+		break;
+	    case SYS_lseek:
+		
+		pos |= (off_t)tf->tf_a2;
+		pos <<= 32;
+		pos |= (off_t)tf->tf_a3;
+
+		err = copyin((const userptr_t)tf->tf_sp + 16, &whence, sizeof(whence));
+		if (err)
+			break;
+
+		err = sys_lseek((int) tf->tf_a0, pos, (int)whence);
+		if (!err) {
+			retval = err>>32;
+			tf->tf_v1 = err;
+		}
 		break;
 	    case SYS_dup2:
-		err = sys_dup2((int)tf->tf_a0, (int)tf->tf_a1, &retval);
+		err = sys_dup2((int)tf->tf_a0, (int)tf->tf_a1);
 		break;
 	    case SYS_getpid:
 		err = sys_getpid(&retval);

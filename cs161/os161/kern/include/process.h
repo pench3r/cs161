@@ -7,6 +7,7 @@
 #define _PROCESS_H_
 #include <types.h>
 #include <vnode.h>
+#define MAXPROCESS 100
 
 // array that holds running processes
 extern struct process* proc_table[];
