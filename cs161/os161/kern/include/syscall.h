@@ -17,8 +17,8 @@ int sys_close(int fd, int *retval);
 int sys_dup2(int oldfd, int newfd);
 
 // Process Syscalls
-int sys_waitpid(pid_t theirPID, int* status, int flags, pid_t *retval);
-void sys__exit(int exitCode);
+int sys_waitpid(int theirPID, int* status, int flags, int *retval);
+int sys__exit(int exitCode);
 int sys_fork(struct trapframe* ptf, int *retval);
 int sys_execv(userptr_t prog, userptr_t argv);
 
