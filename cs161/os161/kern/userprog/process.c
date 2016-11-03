@@ -12,12 +12,34 @@
 
 struct process* ptable[MAXPROCESS];
 
-int sys_fork(struct trapframe* ptf, int *retval) {
+int sys_fork(struct trapframe* ptf) {
 	return 0;
 }
 
 // Process Syscalls
-int sys_waitpid(int theirPID, int* status, int flags, int *retval) {
+int sys_waitpid(int theirPID, int* status, int flags) {
+	int error;
+	if(theirPID >= MAXPROCESS || theirPID < 0 || ptable[theirPID] == NULL) {
+		return EFAULT;
+	}
+	if(status == NULL) {
+		return EFAULT;
+	}
+	if(flags != 0) {
+		return EINVAL;
+	}
+	if(curthread->t_pid != ptable[theirPID]->parent_pid) {
+		return EFAULT;
+	}
+	if(ptable[theirPID]->exited == 0) {
+		lock_acquire(ptable[theirPID]->lock_proc);
+		cv_wait(ptable[theirPID]->wait_cv, ptable[theirPID]->lock_proc);
+	}
+	lock_release(ptable[theirPID]->lock_proc);
+	cv_destroy(ptable[theirPID]->wait_cv);
+	lock_destroy(ptable[theirPID]->lock_proc);
+	kfree(ptable[theirPID]);
+	ptable[theirPID] == NULL;
 	return 0;
 }
 
@@ -34,7 +56,7 @@ int sys__exit(int exitCode) {
 			ptable[pid]->parent_pid = -1;
 		}
 	}
-	int retval = 0;
+	
 	cv_broadcast(ptable[curthread->t_pid]->wait_cv, ptable[curthread->t_pid]->lock_proc);
 	lock_release(ptable[curthread->t_pid]->lock_proc);
 	thread_exit();
