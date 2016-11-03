@@ -105,7 +105,7 @@ mips_syscall(struct trapframe *tf)
 		err = sys_getpid(&retval);
 		break; 
 	    case SYS_fork:
-		err = sys_fork(tf, &retval);
+		err = sys_fork(tf);
 		break;
 	    case SYS__exit:
 		err = sys__exit((int) tf->tf_a0);
@@ -114,7 +114,7 @@ mips_syscall(struct trapframe *tf)
 		err = sys_execv((userptr_t) tf->tf_a0, (userptr_t) tf->tf_a1);
 		break;
 	    case SYS_waitpid:
-		err = sys_waitpid((int) tf->tf_a0, (int*) tf->tf_a1,(int) tf->tf_a2, &retval);
+		err = sys_waitpid((int) tf->tf_a0, (int*) tf->tf_a1,(int) tf->tf_a2);
 		break;
 	    default:
 		kprintf("Unknown syscall %d\n", callno);
