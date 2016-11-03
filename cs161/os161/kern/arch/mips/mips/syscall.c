@@ -72,10 +72,10 @@ mips_syscall(struct trapframe *tf)
 		err = sys_reboot(tf->tf_a0);
 		break;
 	    case SYS_open:
-		err = sys_open((const char*)tf->tf_a0, tf->tf_a1, &retval);
+		err = sys_open((const char*)tf->tf_a0, tf->tf_a1);
 		break;
 	    case SYS_close:
-		err = sys_close((int)tf->tf_a0, &retval);
+		err = sys_close((int)tf->tf_a0);
 		break;
 	    case SYS_write:
 		kprintf("hello");

@@ -61,7 +61,7 @@ int sys_write(int fd, const void *buf, size_t nbytes){
 	return result;
 }
 
-int sys_lseek(int fd, off_t offset, int whence){
+int sys_lseek(int fd, off_t pos, int whence){
 	struct openfile * ofile;
 	struct stat fstat;
 	int err = 0;
@@ -75,16 +75,16 @@ int sys_lseek(int fd, off_t offset, int whence){
 
 	switch(whence) {
 		case SEEK_SET:
-		err = VOP_TRYSEEK(ofile->vnode_ptr, offset);
+		err = VOP_TRYSEEK(ofile->vnode_ptr, pos);
 		if (err) {
 			lock_release(ofile->vnode_lock);
 			return err;
 		}
-		ofile->offset = offset;
+		ofile->offset = pos;
 		break;
 
 		case SEEK_CUR:
-		temp = ofile->offset + offset;
+		temp = ofile->offset + pos;
 		err = VOP_TRYSEEK(ofile->vnode_ptr, temp);
 		if (err) {
 			lock_release(ofile->vnode_lock);
@@ -99,7 +99,7 @@ int sys_lseek(int fd, off_t offset, int whence){
 			lock_release(ofile->vnode_lock);
 			return err;
 		}
-		temp = fstat.st_size + offset;
+		temp = fstat.st_size + pos;
 		err = VOP_TRYSEEK(ofile->vnode_ptr, temp);
 		if (err) {
 			lock_release(ofile->vnode_lock);
@@ -119,7 +119,7 @@ int sys_lseek(int fd, off_t offset, int whence){
 	return ofile->offset;
 }
 
-int sys_close(int fd, int *retval){
+int sys_close(int fd){
 	struct lock *lockptr;
 	int flag = 0;
 
@@ -128,7 +128,6 @@ int sys_close(int fd, int *retval){
 	}
 	
 	if (curthread->openfileTable[fd] == NULL) {
-		*retval = -1;
 		return EBADF;
 	}
 
@@ -146,7 +145,6 @@ int sys_close(int fd, int *retval){
 	}
 
 	curthread->openfileTable[fd] = NULL;
-	*retval = 0;
 	lock_release(lockptr);
 
 	if (flag == 1) {
@@ -155,7 +153,7 @@ int sys_close(int fd, int *retval){
 
 	return 0;
 }
-int sys_dup2(int oldfd, int newfd, int *retval){
+int sys_dup2(int oldfd, int newfd) {
 
 	int err = 0;
 
@@ -164,12 +162,11 @@ int sys_dup2(int oldfd, int newfd, int *retval){
 	}
 
 	if (oldfd == newfd) {
-		*retval = newfd;
-		return 0;
+		return newfd;
 	}
 
 	if (curthread->openfileTable[newfd] != NULL) {
-		err = sys_close(newfd, retval);
+		err = sys_close(newfd);
 		if (err)
 			return err;
 	}
@@ -178,8 +175,7 @@ int sys_dup2(int oldfd, int newfd, int *retval){
 	lock_acquire(ofile->vnode_lock);
 	curthread->openfileTable[newfd] = ofile;
 	curthread->openfileTable[newfd]->ref_count++;
-	retval = newfd;
 	lock_release(ofile->vnode_lock);
 
-	return 0;
+	return newfd;
 }
