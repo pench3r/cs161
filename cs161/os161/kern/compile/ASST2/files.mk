@@ -404,6 +404,11 @@ uio.o: ${S}/userprog/uio.c
 SRCS+=${S}/userprog/uio.c
 OBJS+=uio.o
 
+file.o: ${S}/userprog/file.c
+	${COMPILE.c} ${S}/userprog/file.c
+SRCS+=${S}/userprog/file.c
+OBJS+=file.o
+
 getpid_syscall.o: ${S}/userprog/getpid_syscall.c
 	${COMPILE.c} ${S}/userprog/getpid_syscall.c
 SRCS+=${S}/userprog/getpid_syscall.c

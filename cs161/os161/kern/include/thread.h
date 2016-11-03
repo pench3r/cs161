@@ -7,6 +7,8 @@
 
 /* Get machine-dependent stuff */
 #include <machine/pcb.h>
+#include <file.h>
+#include <types.h>
 
 
 struct addrspace;
@@ -20,7 +22,6 @@ struct thread {
 	char *t_name;
 	const void *t_sleepaddr;
 	char *t_stack;
-	pid_t t_pid;	
 
 	/**********************************************************/
 	/* Public thread members - can be used by other code      */
@@ -38,6 +39,9 @@ struct thread {
 	 * and is manipulated by the virtual filesystem (VFS) code.
 	 */
 	struct vnode *t_cwd;
+	pid_t t_pid;	
+	openfile openfileTable[MAX_FILETABLE_LENGTH];
+	
 };
 
 /* Call once during startup to allocate data structures. */

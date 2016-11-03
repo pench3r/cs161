@@ -61,6 +61,10 @@ thread_create(const char *name)
 	
 	// If you add things to the thread structure, be sure to initialize
 	// them here.
+	int i = 0;
+	for (; i < MAX_FILETABLE_LENGTH; i++) {
+		thread->openfileTable[i] = NULL;
+	}
 	
 	return thread;
 }
