@@ -14,6 +14,8 @@
 #include <vnode.h>
 #include "opt-synchprobs.h"
 #include <file.h>
+#include "process.h"
+
 /* States a thread can be in. */
 typedef enum {
 	S_RUN,
@@ -67,6 +69,14 @@ thread_create(const char *name)
 		thread->openfileTable[i] = NULL;
 		//(openfile)  {0};
 	}
+
+	pid_t temppid = proc_init(thread);
+
+	if (temppid == -1) {
+		return NULL;
+	}
+
+	thread->t_pid = temppid;
 	
 	return thread;
 }
