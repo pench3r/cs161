@@ -333,7 +333,10 @@ process.o: ../../userprog/process.c ../../include/types.h machine/types.h \
   ../../include/synch.h ../../include/vfs.h ../../include/uio.h \
   ../../include/vnode.h ../../include/curthread.h ../../include/syscall.h \
   ../../include/file.h ../../include/process.h ../../include/thread.h \
-  machine/pcb.h machine/setjmp.h ../../include/file.h
+  machine/pcb.h machine/setjmp.h ../../include/file.h \
+  ../../include/addrspace.h ../../include/vm.h machine/vm.h opt-dumbvm.h \
+  machine/trapframe.h ../../include/test.h ../../include/kern/limits.h \
+  ../../include/kern/unistd.h
 getpid_syscall.o: ../../userprog/getpid_syscall.c ../../include/types.h \
   machine/types.h ../../include/kern/types.h ../../include/syscall.h \
   ../../include/thread.h machine/pcb.h machine/setjmp.h \
