@@ -8,7 +8,7 @@ struct trapframe;
 
 int sys_reboot(int code);
 int sys_getpid(pid_t *retval);
-int sys_fork(struct trapframe* ptf, int *retval);
+int sys_fork(struct trapframe* ptf);
 
 //File Syscalls
 int sys_open(const char *path, int oflag, int *retfd);
@@ -19,7 +19,7 @@ int sys_close(int fd);
 int sys_dup2(int oldfd, int newfd);
 
 // Process Syscalls
-int sys_waitpid(int theirPID, int* status, int flags, int *retval);
+int sys_waitpid(int theirPID, int* status, int flags);
 int sys__exit(int exitCode);
 int sys_execv(userptr_t prog, userptr_t argv);
 
