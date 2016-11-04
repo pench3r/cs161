@@ -1,6 +1,6 @@
 
-forktest.o: \
- forktest.c \
+getpidtest.o: \
+ getpidtest.c \
  $(OSTREE)/include/unistd.h \
  $(OSTREE)/include/sys/types.h \
  $(OSTREE)/include/machine/types.h \

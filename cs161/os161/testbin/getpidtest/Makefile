@@ -1,7 +1,7 @@
-# Makefile for forktest
+# Makefile for getpidtest
 
-SRCS=forktest.c
-PROG=forktest
+SRCS=getpidtest.c
+PROG=getpidtest
 BINDIR=/testbin
 
 include ../../defs.mk
