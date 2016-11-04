@@ -158,11 +158,11 @@ HOST_LIBS+=
 
 
 # These are cflags used to conditionally compile src/lib/hostcompat.
-COMPAT_CFLAGS= -DNEED_ERR
+COMPAT_CFLAGS=
 
 # These are make targets that we conditionally enable when installing
 # in src/lib/hostcompat.
-COMPAT_TARGETS= install-errh
+COMPAT_TARGETS=
 
 
 # When we compile OS/161 programs, we want to use the OS/161 header files
