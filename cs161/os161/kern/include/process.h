@@ -5,6 +5,8 @@
  */
 #ifndef _PROCESS_H_
 #define _PROCESS_H_
+#include <types.h>
+#include <vnode.h>
 
 // array that holds running processes
 extern struct process* proc_table[];
@@ -16,7 +18,7 @@ struct process {
    int exited;
    int exitcode;
    struct thread *self;
-}
+};
 
 int proc_init(struct thread *t);
 

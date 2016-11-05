@@ -8,6 +8,7 @@
 #include "syscall.h"
 #include "file.h"
 #include <thread.h>
+
 int sys_open(const char *path, int oflag, int *retfd) {
 	int err = 0;
 	struct vnode *vn = {0};	
@@ -93,6 +94,6 @@ int sys_close(int fd, int *retval){
 
 	return 0;
 }
-int sys_dup2(int oldfd, int newfd){
+int sys_dup2(int oldfd, int newfd, int *retval){
 	return 0;
 }
