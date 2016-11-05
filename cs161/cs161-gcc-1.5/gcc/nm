@@ -1,2 +1,0 @@
-#!/bin/sh
-exec /root/cs161/tools/bin/mips-linux-nm "$@"
