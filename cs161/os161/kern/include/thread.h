@@ -40,7 +40,7 @@ struct thread {
 	 */
 	struct vnode *t_cwd;
 	pid_t t_pid;	
-	openfile openfileTable[MAX_FILETABLE_LENGTH];
+	struct openfile openfileTable[MAX_FILETABLE_LENGTH];
 	
 };
 

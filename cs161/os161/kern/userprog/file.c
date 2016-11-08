@@ -6,14 +6,14 @@
 #include <curthread.h>
 #include "syscall.h"
 #include "file.h"
-
+#include <thread.h>
 int sys_open(const char *path, int oflag, int *retfd) {
 	int err = 0;
-	struct vnode *vn;	
+	struct vnode *vn = {0};	
 	err = vfs_open(&path, oflag, &vn);
 
 	if (err == 0) {
-		openfile *ofile;
+		openfile *ofile = {0};
 		ofile->offset = 0;
 		ofile->ref_count = 1;
 		ofile->vnode_ptr = vn;
@@ -24,7 +24,7 @@ int sys_open(const char *path, int oflag, int *retfd) {
 
 		int i = 0;
 		for (; i < MAX_FILETABLE_LENGTH; i++) {
-			if (curthread->openfileTable[i] == NULL) {
+			if (curthread->openfileTable[i].vnode_ptr == NULL) {
 				*retfd = i;	
 				break;
 			}

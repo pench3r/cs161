@@ -13,7 +13,7 @@
 #include <addrspace.h>
 #include <vnode.h>
 #include "opt-synchprobs.h"
-
+#include <file.h>
 /* States a thread can be in. */
 typedef enum {
 	S_RUN,
@@ -63,7 +63,7 @@ thread_create(const char *name)
 	// them here.
 	int i = 0;
 	for (; i < MAX_FILETABLE_LENGTH; i++) {
-		thread->openfileTable[i] = NULL;
+		thread->openfileTable[i] = (openfile)  {0};
 	}
 	
 	return thread;
