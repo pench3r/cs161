@@ -9,7 +9,6 @@
 #include <vnode.h>
 #define MAXPROCESS 100
 
-#define MAXPROCESS 100
 
 // array that holds running processes
 extern struct process* proc_table[];
@@ -22,6 +21,8 @@ struct process {
    int exitcode;
    struct thread *self;
 };
+
+void entered_forked_proc(void* xtf, unsigned long xul);
 
 int proc_init(struct thread *t);
 
