@@ -322,10 +322,10 @@ uio.o: ../../userprog/uio.c ../../include/types.h machine/types.h \
   ../../include/file.h ../../include/vnode.h ../../include/curthread.h
 file.o: ../../userprog/file.c ../../include/types.h machine/types.h \
   ../../include/kern/types.h ../../include/kern/errno.h \
-  ../../include/synch.h ../../include/vfs.h ../../include/vnode.h \
-  ../../include/curthread.h ../../include/syscall.h ../../include/file.h \
-  ../../include/thread.h machine/pcb.h machine/setjmp.h \
-  ../../include/file.h
+  ../../include/synch.h ../../include/vfs.h ../../include/uio.h \
+  ../../include/vnode.h ../../include/curthread.h ../../include/syscall.h \
+  ../../include/file.h ../../include/thread.h machine/pcb.h \
+  machine/setjmp.h ../../include/file.h
 getpid_syscall.o: ../../userprog/getpid_syscall.c ../../include/types.h \
   machine/types.h ../../include/kern/types.h ../../include/syscall.h \
   ../../include/thread.h machine/pcb.h machine/setjmp.h \

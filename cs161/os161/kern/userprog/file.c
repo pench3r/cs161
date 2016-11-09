@@ -2,6 +2,7 @@
 #include <kern/errno.h>
 #include <synch.h>
 #include <vfs.h>
+#include <uio.h>
 #include <vnode.h>
 #include <curthread.h>
 #include "syscall.h"
@@ -34,10 +35,24 @@ int sys_open(const char *path, int oflag, int *retfd) {
 	return err;
 }
 int sys_read(int fd, void *buf, size_t nbytes){
-	return 0;
+	openfile* op = curthread->openfileTable[fd];
+	struct uio userio;
+	lock_acquire(op->vnode_lock);
+	mk_kuio(&userio, &op, sizeof(nbytes), 0, UIO_READ);
+	int result;
+	result = VOP_READ(op->vnode_ptr, &userio);
+	lock_release(op->vnode_lock);
+	return result;
 }
 int sys_write(int fd, const void *buf, size_t nbytes){
-	return 0;
+	openfile* op = curthread->openfileTable[fd];
+	struct uio userio;
+	lock_acquire(op->vnode_lock);
+	mk_kuio(&userio, &op, sizeof(nbytes), 0, UIO_WRITE);
+	int result;
+	result = VOP_WRITE(op->vnode_ptr, &userio);
+	lock_release(op->vnode_lock);
+	return result;
 }
 int sys_lseek(int fd, off_t offset, int whence){
 	return 0;
