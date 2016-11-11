@@ -40,6 +40,9 @@ int sys_open(const char *path, int oflag, int *retfd) {
 }
 
 int sys_read(int fd, void *buf, size_t nbytes){
+	if(fd < 0 || fd > MAX_FILETABLE_LENGTH || curthread->openfileTable[fd] == NULL) {
+		return EBADF;
+	}
 	openfile* op = curthread->openfileTable[fd];
 	struct uio userio;
 	lock_acquire(op->vnode_lock);
@@ -51,6 +54,9 @@ int sys_read(int fd, void *buf, size_t nbytes){
 }
 
 int sys_write(int fd, const void *buf, size_t nbytes){
+	if(fd <  0 || fd > MAX_FILETABLE_LENGTH || curthread->openfileTable[fd] == NULL) {
+		return EBADF;
+	}	
 	openfile* op = curthread->openfileTable[fd];
 	struct uio userio;
 	lock_acquire(op->vnode_lock);
