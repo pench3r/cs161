@@ -43,7 +43,7 @@ int sys_read(int fd, void *buf, size_t nbytes){
 	openfile* op = curthread->openfileTable[fd];
 	struct uio userio;
 	lock_acquire(op->vnode_lock);
-	mk_kuio(&userio, &op, sizeof(nbytes), 0, UIO_READ);
+	mk_kuio(&userio, &buf, sizeof(nbytes), op->offset, UIO_READ);
 	int result;
 	result = VOP_READ(op->vnode_ptr, &userio);
 	lock_release(op->vnode_lock);
@@ -54,7 +54,7 @@ int sys_write(int fd, const void *buf, size_t nbytes){
 	openfile* op = curthread->openfileTable[fd];
 	struct uio userio;
 	lock_acquire(op->vnode_lock);
-	mk_kuio(&userio, &op, sizeof(nbytes), 0, UIO_WRITE);
+	mk_kuio(&userio, &buf, sizeof(nbytes), op->offset, UIO_WRITE);
 	int result;
 	result = VOP_WRITE(op->vnode_ptr, &userio);
 	lock_release(op->vnode_lock);

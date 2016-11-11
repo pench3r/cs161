@@ -409,6 +409,11 @@ file.o: ${S}/userprog/file.c
 SRCS+=${S}/userprog/file.c
 OBJS+=file.o
 
+process.o: ${S}/userprog/process.c
+	${COMPILE.c} ${S}/userprog/process.c
+SRCS+=${S}/userprog/process.c
+OBJS+=process.o
+
 getpid_syscall.o: ${S}/userprog/getpid_syscall.c
 	${COMPILE.c} ${S}/userprog/getpid_syscall.c
 SRCS+=${S}/userprog/getpid_syscall.c

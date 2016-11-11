@@ -384,7 +384,7 @@ file      userprog/loadelf.c
 file      userprog/runprogram.c
 file      userprog/uio.c
 file	  userprog/file.c
-
+file	  userprog/process.c
 file      userprog/getpid_syscall.c
 
 #

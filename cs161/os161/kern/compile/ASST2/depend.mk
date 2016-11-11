@@ -321,11 +321,19 @@ uio.o: ../../userprog/uio.c ../../include/types.h machine/types.h \
   ../../include/uio.h ../../include/thread.h machine/pcb.h \
   ../../include/file.h ../../include/vnode.h ../../include/curthread.h
 file.o: ../../userprog/file.c ../../include/types.h machine/types.h \
+  ../../include/kern/types.h ../../include/vnode.h \
+  ../../include/kern/errno.h ../../include/kern/unistd.h \
+  ../../include/synch.h ../../include/addrspace.h ../../include/vm.h \
+  machine/vm.h opt-dumbvm.h ../../include/vfs.h ../../include/uio.h \
+  ../../include/curthread.h ../../include/kern/stat.h \
+  ../../include/thread.h machine/pcb.h machine/setjmp.h \
+  ../../include/file.h ../../include/syscall.h
+process.o: ../../userprog/process.c ../../include/types.h machine/types.h \
   ../../include/kern/types.h ../../include/kern/errno.h \
   ../../include/synch.h ../../include/vfs.h ../../include/uio.h \
   ../../include/vnode.h ../../include/curthread.h ../../include/syscall.h \
-  ../../include/file.h ../../include/thread.h machine/pcb.h \
-  machine/setjmp.h ../../include/file.h
+  ../../include/file.h ../../include/process.h ../../include/thread.h \
+  machine/pcb.h machine/setjmp.h ../../include/file.h
 getpid_syscall.o: ../../userprog/getpid_syscall.c ../../include/types.h \
   machine/types.h ../../include/kern/types.h ../../include/syscall.h \
   ../../include/thread.h machine/pcb.h machine/setjmp.h \
